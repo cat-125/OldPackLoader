@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "oldpackloader",
+  "version": "${version}",
+  "name": "Old Pack Loader",
+  "description": "Loads resource packs made for older versions",
+  "authors": [],
+  "contact": {},
+  "license": "MIT",
+  "icon": "assets/oldpackloader/icon.png",
+  "environment": "client",
+  "accessWidener": "oldpackloader.accesswidener",
+  "mixins": [
+    "oldpackloader.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "minecraft": "${minecraft_version}"
+  }
+}
