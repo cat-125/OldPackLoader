@@ -80,8 +80,8 @@ java {
 }
 
 tasks.jar {
-    from(files("lib/ResourcePackConverter/LICENSE", "lib/ResourcePackConverter/LICENSE-hypixel")) {
-        into("META-INF/licenses/ResourcePackConverter")
+    from(files("licenses/LICENSE-ResourcePackLoader", "licenses/LICENSE-Hypixel")) {
+        into("META-INF/licenses/")
     }
 
     from("LICENSE") {
