@@ -84,6 +84,8 @@ public class CachedZipPack extends Pack {
         }
 
         public void finish() throws IOException {
+            PackConverter.applyFixes(pack.getWorkingPath());
+
             try {
                 Logger.debug("Zipping working directory");
                 ZipFile zipFile = new ZipFile(this.getConvertedZipPath().toFile());

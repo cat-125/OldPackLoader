@@ -3,7 +3,9 @@ package dev.cat125.oldpackloader;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import net.minecraft.SharedConstants;
 import net.minecraft.server.packs.PackResources;
+import net.minecraft.server.packs.PackType;
 import net.minecraft.server.packs.resources.IoSupplier;
 import org.jspecify.annotations.NonNull;
 
@@ -13,8 +15,13 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 
 public record PackVersion(int major, int minor) implements Comparable<PackVersion> {
-    public static final PackVersion CURRENT = new PackVersion(88, 0);
+    public static final PackVersion CURRENT;
     public static final PackVersion UNKNOWN = new PackVersion(Integer.MAX_VALUE, Integer.MAX_VALUE);
+
+    static {
+        var ver = SharedConstants.getCurrentVersion().packVersion(PackType.CLIENT_RESOURCES);
+        CURRENT = new PackVersion(ver.major(), ver.minor());
+    }
 
     public static PackVersion detect(PackResources resources) throws IOException {
         IoSupplier<InputStream> supplier = resources.getRootResource(PackResources.PACK_META);
@@ -74,6 +81,8 @@ public record PackVersion(int major, int minor) implements Comparable<PackVersio
 
         return UNKNOWN;
     }
+
+    public int toInt() { return major() * 10 + minor(); }
 
     public boolean isKnown() {
         return major != Integer.MAX_VALUE || minor != Integer.MAX_VALUE;
