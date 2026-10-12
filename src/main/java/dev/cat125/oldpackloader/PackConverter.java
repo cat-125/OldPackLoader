@@ -7,6 +7,7 @@ import com.google.gson.JsonParser;
 import net.minecraft.client.Minecraft;
 import net.minecraft.server.packs.FilePackResources;
 import net.minecraft.server.packs.PackResources;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,83 +52,91 @@ public class PackConverter {
             if (!packVersion.needsMigration()) return originalResources;
 
             if (originalResources instanceof FilePackResources res) {
-                var packFile = res.zipFileAccess.file;
-
-                // Skip built-in packs
-                if (!packFile.getName().endsWith(".zip")) return originalResources;
-
-                var packHash = fileHash(packFile);
-                var packKey = CONVERTER_VERSION + "|" + packHash;
-
-                File convertedFile;
-
-                if (cache.has(packKey)) {
-                    var converted = cache.get(packKey).getAsString();
-                    if (converted.equals(RESULT_FAIL)) {
-                        // Don't try converting it again until the mod updates
-                        convertedFile = null;
-                    } else {
-                        // Use the existing converted pack
-                        convertedFile = new File(converted);
-                        if (!convertedFile.exists()) {
-                            convertedFile = null;
-                            cache.remove(packKey);
-                            saveCache();
-                        }
-                    }
-                } else {
-                    // Check if we need to delete old converted file
-                    var oldKey = (CONVERTER_VERSION - 1) + "|" + packHash;
-                    if (cache.has(oldKey)) {
-                        var oldFile = new File(cache.get(oldKey).getAsString());
-                        if (oldFile.exists() && oldFile.toPath().startsWith(cacheDir)) {
-                            var _ = oldFile.delete();
-                        }
-                        cache.remove(oldKey);
-                    }
-
-                    // Try converting the pack
-                    var targetVersion = PackVersion.CURRENT;
-                    var outPath = cacheDir.resolve(packFile.getName());
-                    var pack = new CachedZipPack(packFile.toPath(), outPath);
-                    var converter = new ForwardsPackConverter(
-                            GSON,
-                            packVersion.toInt(),
-                            targetVersion.toInt(),
-                            "none",
-                            packFile.toPath(),
-                            true,
-                            loggingPrintStream()
-                    );
-                    LOGGER.info("Converting pack {} from {} to {}", packFile.getName(), packVersion, targetVersion);
-                    synchronized (CONVERSION_LOCK) {
-                        converter.runPack(pack);
-                    }
-                    convertedFile = outPath.toFile();
-
-                    // Save the result
-                    if (convertedFile.exists()) {
-                        cache.addProperty(packKey, convertedFile.getAbsolutePath());
-                    } else {
-                        cache.addProperty(packKey, RESULT_FAIL);
-                        convertedFile = null;
-                    }
-                    saveCache();
-                }
-
-                if (convertedFile != null) {
-                    return new FilePackResources(
-                            originalResources.location(),
-                            new FilePackResources.SharedZipFileAccess(convertedFile),
-                            res.prefix
-                    );
-                }
+                PackResources converted = convertPackFile(originalResources, res, packVersion);
+                if (converted != null) return converted;
             }
         } catch (Exception e) {
             LOGGER.error("Failed to convert resource pack", e);
         }
 
         return originalResources;
+    }
+
+    private static @Nullable PackResources convertPackFile(
+            PackResources originalResources,
+            FilePackResources res,
+            PackVersion packVersion
+    ) throws NoSuchAlgorithmException, IOException {
+
+        var packFile = res.zipFileAccess.file;
+
+        // Skip built-in packs
+        if (!packFile.getName().endsWith(".zip")) return originalResources;
+
+        var packHash = fileHash(packFile);
+        var packKey = CONVERTER_VERSION + "|" + packHash;
+
+        File convertedFile;
+
+        if (cache.has(packKey)) {
+            var converted = cache.get(packKey).getAsString();
+            if (converted.equals(RESULT_FAIL)) {
+                // Don't try converting it again until the mod updates
+                convertedFile = null;
+            } else {
+                // Use the existing converted pack
+                convertedFile = new File(converted);
+                if (!convertedFile.exists()) {
+                    convertedFile = null;
+                    cache.remove(packKey);
+                    saveCache();
+                }
+            }
+        } else {
+            // Check if we need to delete old converted file
+            var oldKey = (CONVERTER_VERSION - 1) + "|" + packHash;
+            if (cache.has(oldKey)) {
+                var oldFile = new File(cache.get(oldKey).getAsString());
+                if (oldFile.exists() && oldFile.toPath().startsWith(cacheDir)) {
+                    var _ = oldFile.delete();
+                }
+                cache.remove(oldKey);
+            }
+
+            // Try converting the pack
+            var targetVersion = PackVersion.CURRENT;
+            var outPath = cacheDir.resolve(packFile.getName());
+            var pack = new CachedZipPack(packFile.toPath(), outPath);
+            var converter = new ForwardsPackConverter(
+                    GSON,
+                    packVersion.toInt(),
+                    targetVersion.toInt(),
+                    "none",
+                    packFile.toPath(),
+                    true,
+                    loggingPrintStream()
+            );
+            LOGGER.info("Converting pack {} from {} to {}", packFile.getName(), packVersion, targetVersion);
+            synchronized (CONVERSION_LOCK) {
+                converter.runPack(pack);
+            }
+            convertedFile = outPath.toFile();
+
+            // Save the result
+            if (convertedFile.exists()) {
+                cache.addProperty(packKey, convertedFile.getAbsolutePath());
+            } else {
+                cache.addProperty(packKey, RESULT_FAIL);
+                convertedFile = null;
+            }
+            saveCache();
+        }
+
+        return convertedFile != null ? new FilePackResources(
+                originalResources.location(),
+                new FilePackResources.SharedZipFileAccess(convertedFile),
+                res.prefix
+        ) : null;
     }
 
     public static void applyFixes(Path workDir) {
